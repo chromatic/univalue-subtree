@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -46,6 +47,29 @@ public:
     UniValue(const char *val_) {
         std::string s(val_);
         setStr(s);
+    }
+
+    // Add copy constructor
+    UniValue(const UniValue& other) : 
+        typ(other.typ),
+        val(other.val),
+        keys(other.keys),
+        values(other.values)  // This will properly copy construct the vector
+    {
+        if (other.key_lookup) {
+            key_lookup = std::make_unique<std::unordered_map<std::string, size_t>>(*other.key_lookup);
+        }
+    }
+
+    // Update assignment operator to use copy-and-swap idiom
+    UniValue& operator=(UniValue other) {
+        // other is already a copy, now swap contents
+        std::swap(typ, other.typ);
+        std::swap(val, other.val);
+        std::swap(keys, other.keys);
+        std::swap(values, other.values);
+        std::swap(key_lookup, other.key_lookup);
+        return *this;
     }
 
     void clear();
@@ -104,7 +128,8 @@ private:
     std::string val;
     std::vector<std::string> keys;
     std::vector<UniValue> values;
-    std::unordered_map<std::string, size_t> key_lookup;
+    static constexpr size_t SMALL_OBJECT_THRESHOLD = 8;
+    std::unique_ptr<std::unordered_map<std::string, size_t>> key_lookup;
 
     bool findKey(const std::string& key, size_t& retIdx) const;
     void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;

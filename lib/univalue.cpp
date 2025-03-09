@@ -21,7 +21,7 @@ void UniValue::clear()
     val.clear();
     keys.clear();
     values.clear();
-    key_lookup.clear();
+    key_lookup.reset();
 }
 
 bool UniValue::setNull()
@@ -133,7 +133,18 @@ void UniValue::__pushKV(const std::string& key, const UniValue& val_)
     size_t idx = values.size();
     keys.push_back(key);
     values.push_back(val_);
-    key_lookup[key] = idx;
+    
+    if (values.size() > SMALL_OBJECT_THRESHOLD) {
+        if (!key_lookup) {
+            // Create and populate map when exceeding threshold
+            key_lookup = std::make_unique<std::unordered_map<std::string, size_t>>();
+            for (size_t i = 0; i < keys.size(); ++i) {
+                (*key_lookup)[keys[i]] = i;
+            }
+        } else {
+            (*key_lookup)[key] = idx;
+        }
+    }
 }
 
 bool UniValue::pushKV(const std::string& key, const UniValue& val_)
@@ -143,12 +154,9 @@ bool UniValue::pushKV(const std::string& key, const UniValue& val_)
 
     size_t idx;
     if (findKey(key, idx)) {
-        values[idx] = val_;
+        values[idx] = val_;  // Simply replace the value at the found index
     } else {
-        idx = values.size();
-        keys.push_back(key);
-        values.push_back(val_);
-        key_lookup[key] = idx;
+        __pushKV(key, val_);
     }
     return true;
 }
@@ -171,7 +179,7 @@ void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const
 
     kv.clear();
     for (size_t i = 0; i < keys.size(); i++)
-        kv[keys[i]] = values[i];
+        kv.insert(std::make_pair(keys[i], values[i]));
 }
 
 bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& t) const
@@ -195,8 +203,20 @@ bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& t) const
 }
 
 bool UniValue::findKey(const std::string& key, size_t& retIdx) const {
-    auto it = key_lookup.find(key);
-    if (it != key_lookup.end()) {
+    if (!key_lookup || values.size() <= SMALL_OBJECT_THRESHOLD) {
+        // Linear search for small objects
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (keys[i] == key) {
+                retIdx = i;
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Use map lookup for larger objects
+    auto it = key_lookup->find(key);
+    if (it != key_lookup->end()) {
         retIdx = it->second;
         return true;
     }

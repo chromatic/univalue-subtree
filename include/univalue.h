@@ -14,6 +14,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <unordered_map>
 
 class UniValue {
 public:
@@ -100,9 +101,10 @@ public:
 
 private:
     UniValue::VType typ;
-    std::string val;                       // numbers are stored as C++ strings
+    std::string val;
     std::vector<std::string> keys;
     std::vector<UniValue> values;
+    std::unordered_map<std::string, size_t> key_lookup;
 
     bool findKey(const std::string& key, size_t& retIdx) const;
     void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;

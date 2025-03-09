@@ -21,6 +21,7 @@ void UniValue::clear()
     val.clear();
     keys.clear();
     values.clear();
+    key_lookup.clear();
 }
 
 bool UniValue::setNull()
@@ -129,8 +130,10 @@ bool UniValue::push_backV(const std::vector<UniValue>& vec)
 
 void UniValue::__pushKV(const std::string& key, const UniValue& val_)
 {
+    size_t idx = values.size();
     keys.push_back(key);
     values.push_back(val_);
+    key_lookup[key] = idx;
 }
 
 bool UniValue::pushKV(const std::string& key, const UniValue& val_)
@@ -139,10 +142,14 @@ bool UniValue::pushKV(const std::string& key, const UniValue& val_)
         return false;
 
     size_t idx;
-    if (findKey(key, idx))
+    if (findKey(key, idx)) {
         values[idx] = val_;
-    else
-        __pushKV(key, val_);
+    } else {
+        idx = values.size();
+        keys.push_back(key);
+        values.push_back(val_);
+        key_lookup[key] = idx;
+    }
     return true;
 }
 
@@ -167,18 +174,6 @@ void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const
         kv[keys[i]] = values[i];
 }
 
-bool UniValue::findKey(const std::string& key, size_t& retIdx) const
-{
-    for (size_t i = 0; i < keys.size(); i++) {
-        if (keys[i] == key) {
-            retIdx = i;
-            return true;
-        }
-    }
-
-    return false;
-}
-
 bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& t) const
 {
     if (typ != VOBJ) {
@@ -197,6 +192,15 @@ bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& t) const
     }
 
     return true;
+}
+
+bool UniValue::findKey(const std::string& key, size_t& retIdx) const {
+    auto it = key_lookup.find(key);
+    if (it != key_lookup.end()) {
+        retIdx = it->second;
+        return true;
+    }
+    return false;
 }
 
 const UniValue& UniValue::operator[](const std::string& key) const
@@ -238,10 +242,10 @@ const char *uvTypeName(UniValue::VType t)
 
 const UniValue& find_value(const UniValue& obj, const std::string& name)
 {
-    for (unsigned int i = 0; i < obj.keys.size(); i++)
-        if (obj.keys[i] == name)
-            return obj.values.at(i);
-
+    size_t idx;
+    if (obj.findKey(name, idx)) {
+        return obj.values.at(idx);
+    }
     return NullUniValue;
 }
 

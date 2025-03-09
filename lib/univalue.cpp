@@ -155,25 +155,28 @@ bool UniValue::pushKV(const std::string& key, const UniValue& val_)
     return true;
 }
 
-bool UniValue::pushKVs(const UniValue& obj)
-{
+bool UniValue::pushKVs(const UniValue& obj) {
     if (typ != VOBJ || obj.typ != VOBJ)
         return false;
 
-    for (size_t i = 0; i < obj.keys.size(); i++)
-        __pushKV(obj.keys[i], obj.values.at(i));
-
+    for (size_t i = 0; i < obj.keys.size(); ++i) {
+        if (!pushKV(obj.keys[i], obj.values[i]))
+            return false;
+    }
     return true;
 }
 
-void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const
-{
+void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const {
     if (typ != VOBJ)
         return;
 
     kv.clear();
-    for (size_t i = 0; i < keys.size(); i++)
-        kv.insert(std::make_pair(keys[i], values[i]));
+
+    auto hint = kv.begin();
+    for (size_t i = 0; i < keys.size(); ++i) {
+        // Use hint for ordered insertion
+        hint = kv.emplace_hint(hint, keys[i], values[i]);
+    }
 }
 
 bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& t) const
@@ -247,7 +250,7 @@ const UniValue& UniValue::operator[](size_t index) const
     return values.at(index);
 }
 
-const char *uvTypeName(UniValue::VType t)
+const char *uvTypeName(UniValue::VType t) noexcept
 {
     switch (t) {
     case UniValue::VNULL: return "null";
@@ -270,4 +273,3 @@ const UniValue& find_value(const UniValue& obj, const std::string& name)
     }
     return NullUniValue;
 }
-

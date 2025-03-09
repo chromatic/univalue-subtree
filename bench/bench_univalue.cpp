@@ -69,23 +69,49 @@ void benchmark_object_insertions(int num_keys, bool sequential = true) {
 void benchmark_memory_usage(int num_keys) {
     UniValue small_obj(UniValue::VOBJ);
     UniValue large_obj(UniValue::VOBJ);
+    UniValue large_obj_no_lookup(UniValue::VOBJ);
 
-    // Test small object (< 8 keys)
+    // Test small object (8 keys)
     for (int i = 0; i < 8; i++) {
         small_obj.pushKV("key" + std::to_string(i), i);
     }
 
-    // Test large object
+    // Test large object with lookups
     for (int i = 0; i < num_keys; i++) {
         large_obj.pushKV("key" + std::to_string(i), i);
     }
+    // Force hash table creation by doing a lookup
+    auto val = large_obj["key0"];
+
+    // Test large object without lookups
+    for (int i = 0; i < num_keys; i++) {
+        large_obj_no_lookup.pushKV("key" + std::to_string(i), i);
+    }
+    // No lookups performed, should stay in linear search mode
 
     std::cout << "Memory benchmarks:\n"
               << "  Small object (8 keys): "
               << sizeof(small_obj) << " bytes\n"
-              << "  Large object (" << num_keys << " keys): ~"
+              << "  Large object with lookup (" << num_keys << " keys): ~"
               << (sizeof(large_obj) + large_obj.getKeys().capacity() * sizeof(std::string))
+              << " bytes\n"
+              << "  Large object no lookup (" << num_keys << " keys): ~"
+              << (sizeof(large_obj_no_lookup) + large_obj_no_lookup.getKeys().capacity() * sizeof(std::string))
               << " bytes\n";
+
+    // Demonstrate lookup behavior
+    auto start = std::chrono::high_resolution_clock::now();
+    val = large_obj["key" + std::to_string(num_keys/2)];  // Uses hash table
+    auto hash_lookup = std::chrono::high_resolution_clock::now();
+    val = large_obj_no_lookup["key" + std::to_string(num_keys/2)];  // Uses linear search
+    auto linear_lookup = std::chrono::high_resolution_clock::now();
+
+    auto hash_time = std::chrono::duration_cast<std::chrono::nanoseconds>(hash_lookup - start);
+    auto linear_time = std::chrono::duration_cast<std::chrono::nanoseconds>(linear_lookup - hash_lookup);
+
+    std::cout << "\nLookup timing for key" << num_keys/2 << ":\n"
+              << "  With hash table: " << hash_time.count() << "ns\n"
+              << "  Linear search:   " << linear_time.count() << "ns\n";
 }
 
 int main(int argc, char* argv[]) {

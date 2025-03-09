@@ -129,7 +129,7 @@ private:
     std::vector<std::string> keys;
     std::vector<UniValue> values;
     static constexpr size_t SMALL_OBJECT_THRESHOLD = 8;
-    std::unique_ptr<std::unordered_map<std::string, size_t>> key_lookup;
+    mutable std::unique_ptr<std::unordered_map<std::string, size_t>> key_lookup;
 
     bool findKey(const std::string& key, size_t& retIdx) const;
     void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;

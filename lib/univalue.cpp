@@ -10,6 +10,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -133,17 +134,10 @@ void UniValue::__pushKV(const std::string& key, const UniValue& val_)
     size_t idx = values.size();
     keys.push_back(key);
     values.push_back(val_);
-    
-    if (values.size() > SMALL_OBJECT_THRESHOLD) {
-        if (!key_lookup) {
-            // Create and populate map when exceeding threshold
-            key_lookup = std::make_unique<std::unordered_map<std::string, size_t>>();
-            for (size_t i = 0; i < keys.size(); ++i) {
-                (*key_lookup)[keys[i]] = i;
-            }
-        } else {
-            (*key_lookup)[key] = idx;
-        }
+
+    // Only create key_lookup when we exceed threshold AND need to look something up
+    if (key_lookup) {
+        (*key_lookup)[key] = idx;
     }
 }
 
@@ -202,9 +196,10 @@ bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& t) const
     return true;
 }
 
-bool UniValue::findKey(const std::string& key, size_t& retIdx) const {
-    if (!key_lookup || values.size() <= SMALL_OBJECT_THRESHOLD) {
-        // Linear search for small objects
+bool UniValue::findKey(const std::string& key, size_t& retIdx) const
+{
+    // Always do linear search for small objects
+    if (values.size() <= SMALL_OBJECT_THRESHOLD) {
         for (size_t i = 0; i < keys.size(); ++i) {
             if (keys[i] == key) {
                 retIdx = i;
@@ -213,8 +208,15 @@ bool UniValue::findKey(const std::string& key, size_t& retIdx) const {
         }
         return false;
     }
-    
-    // Use map lookup for larger objects
+
+    // Create key_lookup lazily only when needed for large objects
+    if (!key_lookup) {
+        key_lookup = std::make_unique<std::unordered_map<std::string, size_t>>();
+        for (size_t i = 0; i < keys.size(); ++i) {
+            (*key_lookup)[keys[i]] = i;
+        }
+    }
+
     auto it = key_lookup->find(key);
     if (it != key_lookup->end()) {
         retIdx = it->second;

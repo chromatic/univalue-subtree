@@ -40,7 +40,7 @@ bench_bench_univalue_LDFLAGS = -static $(LIBTOOL_APP_LDFLAGS)
 
 .PHONY: bench
 bench: bench/bench_univalue
-    ./bench/bench_univalue
+	./bench/bench_univalue
 
 test_unitester_SOURCES = $(UNIVALUE_TEST_UNITESTER_INT)
 test_unitester_LDADD = libunivalue.la
